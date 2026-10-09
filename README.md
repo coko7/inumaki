@@ -188,6 +188,9 @@ actions = [
 Key codes for ydotool are Linux input event codes, listed in
 `/usr/include/linux/input-event-codes.h`.
 
+An unknown action `type` stops the script at startup with the list of
+valid types, so typos in `config.toml` show up immediately.
+
 ## Troubleshooting
 
 - **Long delay before commands run.** Check the timing in the log. If
@@ -200,6 +203,10 @@ Key codes for ydotool are Linux input event codes, listed in
   flat acceleration profile for the ydotool virtual device.
 - **"open X" picks the wrong app or none.** Whisper may mishear unusual
   names; add a `phrases` command with a `shell` action for that app.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how the code is organised.
 
 ## License
 
