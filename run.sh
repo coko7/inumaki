@@ -16,4 +16,4 @@ if [ ! -f config.toml ]; then
   echo "Created bare config.toml from config.example.toml."
 fi
 
-exec .venv/bin/python voice_control.py "$@"
+exec .venv/bin/python -m inumaki "$@"
