@@ -4,6 +4,8 @@
 
 Inumaki allows you to control your Linux desktop with your voice.
 
+<img alt="project logo showing a white hair boy yelling arch, neovim and hyprland" src="assets/logo.png" />
+
 </div>
 
 > [!NOTE]
