@@ -1,0 +1,169 @@
+# Voice control config.
+# Copy to config.toml and adjust. Run `./run.sh --list-devices` to find
+# your mic's source name.
+
+###############################################################
+#                                                             #
+# ██╗ ███╗   ██╗ ██╗   ██╗ ███╗   ███╗  █████╗  ██╗  ██╗ ██╗  #
+# ██║ ████╗  ██║ ██║   ██║ ████╗ ████║ ██╔══██╗ ██║ ██╔╝ ██║  #
+# ██║ ██╔██╗ ██║ ██║   ██║ ██╔████╔██║ ███████║ █████╔╝  ██║  #
+# ██║ ██║╚██╗██║ ██║   ██║ ██║╚██╔╝██║ ██╔══██║ ██╔═██╗  ██║  #
+# ██║ ██║ ╚████║ ╚██████╔╝ ██║ ╚═╝ ██║ ██║  ██║ ██║  ██╗ ██║  #
+# ╚═╝ ╚═╝  ╚═══╝  ╚═════╝  ╚═╝     ╚═╝ ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚═╝  #
+#                                                             #
+###############################################################
+
+[settings]
+device = ""                  # e.g. "alsa_input.usb-<vendor>_<model>-00.analog-stereo"; "" = default
+model = "small.en"           # tiny.en / base.en / small.en / medium.en / large-v3 / distil-large-v3
+compute_type = "int8"        # int8 is fast on CPU; use "float16" on a CUDA GPU
+language = "en"
+wake_word = ""               # e.g. "computer" -> say "computer top left"
+silence_ms = 700
+energy_threshold = 0         # 0 = auto-calibrate at startup
+fuzzy_cutoff = 0.8
+screen = [1920, 1080]        # your resolution; needed for "%" coordinates
+launcher = "gtk-launch {id}" # or "uwsm app -- {id}.desktop"
+
+# A command has `phrases` (matched anywhere in the utterance) and/or a
+# `pattern` (Python regex on lowercased, punctuation-free text; add
+# `raw = true` to match the transcript as-is, case-insensitively). Named
+# groups in the pattern fill "{name}" placeholders in the actions.
+# Priority: phrase equal to the whole utterance > pattern > phrase contained
+# in the utterance > fuzzy phrase. So "open terminal" beats "open X", and
+# "type double click" types instead of double-clicking.
+#
+# Action types:
+#   move           x, y         absolute; ints or "50%". Huge values clamp to the edge.
+#   move_relative  dx, dy
+#   click          button = left|right|middle, count
+#   scroll         amount       positive = down
+#   type           text
+#   key            keys         ydotool: "29:1 46:1 46:0 29:0" (keycode:state); xdotool: "ctrl+c"
+#   shell          cmd
+#   launch         app          spoken app name, fuzzy-matched to installed .desktop files
+#   sleep          ms
+
+[[command]]
+phrases = ["top left", "mouse top left"]
+actions = [{ type = "move", x = "1%", y = "1%" }]
+
+[[command]]
+phrases = ["top right", "mouse top right"]
+actions = [{ type = "move", x = "99%", y = "1%" }]
+
+[[command]]
+phrases = ["bottom left", "mouse bottom left"]
+actions = [{ type = "move", x = "1%", y = "99%" }]
+
+[[command]]
+phrases = ["bottom right", "mouse bottom right"]
+actions = [{ type = "move", x = "99%", y = "99%" }]
+
+[[command]]
+phrases = ["center", "middle of the screen", "mouse center"]
+actions = [{ type = "move", x = "50%", y = "50%" }]
+
+[[command]]
+phrases = ["move up"]
+actions = [{ type = "move_relative", dx = 0, dy = -100 }]
+
+[[command]]
+phrases = ["move down"]
+actions = [{ type = "move_relative", dx = 0, dy = 100 }]
+
+[[command]]
+phrases = ["move left"]
+actions = [{ type = "move_relative", dx = -100, dy = 0 }]
+
+[[command]]
+phrases = ["move right"]
+actions = [{ type = "move_relative", dx = 100, dy = 0 }]
+
+[[command]]
+phrases = ["click", "left click"]
+actions = [{ type = "click", button = "left" }]
+
+[[command]]
+phrases = ["double click"]
+actions = [{ type = "click", button = "left", count = 2 }]
+
+[[command]]
+phrases = ["right click"]
+actions = [{ type = "click", button = "right" }]
+
+[[command]]
+phrases = ["scroll down"]
+actions = [{ type = "scroll", amount = 5 }]
+
+[[command]]
+phrases = ["scroll up"]
+actions = [{ type = "scroll", amount = -5 }]
+
+[[command]]
+phrases = ["open terminal"]
+actions = [{ type = "shell", cmd = "xdg-terminal-exec || kitty || alacritty" }]
+
+[[command]]
+pattern = '^(?:please )?(?:open|launch|start) (?:up )?(?:the |an? )?(?P<app>.+?)(?: please)?$'
+actions = [{ type = "launch", app = "{app}" }]
+
+# "type Hello, world" -> types "Hello, world" (keeps Whisper's casing and
+# punctuation, drops the trailing period Whisper adds to sentences).
+[[command]]
+pattern = '^\W*type\W+(?P<text>.+?)\.?$'
+raw = true
+actions = [{ type = "type", text = "{text}" }]
+
+[[command]]
+phrases = ["space", "press space"]
+actions = [{ type = "key", keys = "57:1 57:0" }] # KEY_SPACE (xdotool: "space")
+
+[[command]]
+phrases = ["submit", "press enter"]
+actions = [{ type = "key", keys = "28:1 28:0" }] # KEY_ENTER (xdotool: "Return")
+
+# Hyprland workspaces. Whisper may write digits or words, and mishear
+# "two"/"four"/"eight" as "to"/"for"/"ate", so all variants are listed.
+# With a Lua Hyprland config, use instead:
+#   hyprctl dispatch 'hl.dsp.focus({ workspace = '1' })'
+
+[[command]]
+phrases = ["workspace 1", "workspace one"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch workspace 1" }]
+
+[[command]]
+phrases = ["workspace 2", "workspace two", "workspace to", "workspace too"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch workspace 2" }]
+
+[[command]]
+phrases = ["workspace 3", "workspace three"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch workspace 3" }]
+
+[[command]]
+phrases = ["workspace 4", "workspace four", "workspace for"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch workspace 4" }]
+
+[[command]]
+phrases = ["workspace 5", "workspace five"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch workspace 5" }]
+
+[[command]]
+phrases = ["workspace 6", "workspace six"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch workspace 6" }]
+
+[[command]]
+phrases = ["workspace 7", "workspace seven"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch workspace 7" }]
+
+[[command]]
+phrases = ["workspace 8", "workspace eight", "workspace ate"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch workspace 8" }]
+
+[[command]]
+phrases = ["workspace 9", "workspace nine"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch workspace 9" }]
+
+[[command]]
+phrases = ["workspace 10", "workspace ten"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch workspace 10" }]
