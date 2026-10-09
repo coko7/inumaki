@@ -18,11 +18,13 @@ class Executor:
         self.launcher = settings["launcher"]
         self.apps = AppIndex()
         self.dry_run = dry_run
+
         wayland = os.environ.get("XDG_SESSION_TYPE") == "wayland"
         if wayland or not shutil.which("xdotool"):
             self.backend = "ydotool"
         else:
             self.backend = "xdotool"
+
         if not shutil.which(self.backend) and not dry_run:
             sys.exit(f"{self.backend} not found in PATH")
 
@@ -54,58 +56,82 @@ class Executor:
         if self.dry_run:
             log(f"  (dry-run) {' '.join(cmd)}")
             return
-        subprocess.Popen(cmd, start_new_session=True,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(
+            cmd,
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
     def run(self, action, params=None):
         if params:  # fill "{name}" placeholders from regex captures
-            action = {k: v.format_map(params) if isinstance(v, str) else v
-                      for k, v in action.items()}
-        t = action["type"]
+            action = {
+                k: v.format_map(params) if isinstance(v, str) else v
+                for k, v in action.items()
+            }
+        action_type = action["type"]
         ydo = self.backend == "ydotool"
-        if t == "move":
+
+        if action_type == "move":
             x, y = self._coord(action["x"], 0), self._coord(action["y"], 1)
             if ydo:
                 self._run("ydotool", "mousemove", "--absolute", "-x", x, "-y", y)
             else:
                 self._run("xdotool", "mousemove", x, y)
-        elif t == "move_relative":
+
+        elif action_type == "move_relative":
             dx, dy = int(action.get("dx", 0)), int(action.get("dy", 0))
             if ydo:
                 self._run("ydotool", "mousemove", "-x", dx, "-y", dy)
             else:
                 self._run("xdotool", "mousemove_relative", "--", dx, dy)
-        elif t == "click":
+
+        elif action_type == "click":
             button = action.get("button", "left")
             count = int(action.get("count", 1))
             if ydo:
-                self._run("ydotool", "click", "--repeat", count,
-                          "--next-delay", 80, self.BUTTONS_YDO[button])
+                self._run(
+                    "ydotool",
+                    "click",
+                    "--repeat",
+                    count,
+                    "--next-delay",
+                    80,
+                    self.BUTTONS_YDO[button],
+                )
             else:
-                self._run("xdotool", "click", "--repeat", count,
-                          self.BUTTONS_XDO[button])
-        elif t == "scroll":
+                self._run(
+                    "xdotool", "click", "--repeat", count, self.BUTTONS_XDO[button]
+                )
+
+        elif action_type == "scroll":
             amount = int(action.get("amount", 3))  # positive = down
             if ydo:
                 self._run("ydotool", "mousemove", "--wheel", "-x", 0, "-y", -amount)
             else:
                 btn = "5" if amount > 0 else "4"
                 self._run("xdotool", "click", "--repeat", abs(amount), btn)
-        elif t == "type":
+
+        elif action_type == "type":
             text = action["text"]
             if ydo:
                 self._run("ydotool", "type", "--", text)
             else:
                 self._run("xdotool", "type", "--", text)
-        elif t == "key":
+
+        elif action_type == "key":
             # ydotool: raw "keycode:state" list, e.g. "29:1 46:1 46:0 29:0"
             # xdotool: keysym combo, e.g. "ctrl+c"
             self._run(self.backend, "key", *str(action["keys"]).split())
-        elif t == "shell":
+
+        elif action_type == "shell":
             self._run(action["cmd"], shell=True)
-        elif t == "launch":
+
+        elif action_type == "launch":
             self.launch(action["app"])
-        elif t == "sleep":
+
+        elif action_type == "sleep":
             time.sleep(float(action.get("ms", 100)) / 1000)
+
         else:
-            log(f"  unknown action type: {t}")
+            log(f"  unknown action type: {action_type}")

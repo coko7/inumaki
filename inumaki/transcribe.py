@@ -10,14 +10,20 @@ def build_prompt(settings, commands):
     Unique words only: a long phrase list gets parroted back by Whisper
     ("workspace 1, workspace 9, ...") and decoding that is slow.
     """
+
     prompt = settings["prompt"]
     if prompt != "auto":
         return prompt
+
     phrases = [settings["wake_word"]]
+
+    # collect all phrases
     phrases += [p for c in commands for p in c.get("phrases", [])]
-    words = dict.fromkeys(w for p in phrases for w in normalize(p).split()
-                          if not w.isdigit())
-    return " ".join(list(words)[:settings["prompt_max_words"]])
+    words = dict.fromkeys(
+        w for p in phrases for w in normalize(p).split() if not w.isdigit()
+    )
+
+    return " ".join(list(words)[: settings["prompt_max_words"]])
 
 
 class Transcriber:
@@ -26,8 +32,9 @@ class Transcriber:
 
         self.settings = settings
         log(f"Loading model {settings['model']} ({settings['compute_type']})...")
-        self.model = WhisperModel(settings["model"], device="auto",
-                                  compute_type=settings["compute_type"])
+        self.model = WhisperModel(
+            settings["model"], device="auto", compute_type=settings["compute_type"]
+        )
         self.prompt = build_prompt(settings, commands)
         log(f"Prompt: {self.prompt!r}")
 

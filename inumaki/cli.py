@@ -58,44 +58,57 @@ def main():
     executor = Executor(settings, dry_run=args.dry_run)
     matcher = Matcher(commands, settings["fuzzy_cutoff"])
     wake = normalize(settings["wake_word"])
+
     # Same prefix on the raw transcript, tolerating punctuation ("Computer, ...").
-    wake_re = re.compile(r"^\W*" + r"\W+".join(map(re.escape, wake.split())) + r"\W*",
-                         re.IGNORECASE)
+    wake_re = re.compile(
+        r"^\W*" + r"\W+".join(map(re.escape, wake.split())) + r"\W*", re.IGNORECASE
+    )
     transcribe = Transcriber(settings, commands)
 
     utterances, stop, errors = start_capture(settings)
-    log(f"Listening on {settings['device'] or 'default source'} "
-        f"(backend: {executor.backend}). Ctrl+C to quit.")
+    log(
+        f"Listening on {settings['device'] or 'default source'} "
+        f"(backend: {executor.backend}). Ctrl+C to quit."
+    )
 
     try:
         while True:
             audio = utterances.get()
             if audio is None:
                 sys.exit(f"Capture failed: {errors[0]}")
+
             raw, took, length = transcribe(audio)
             text = normalize(raw)
-            timing = (f"{length:.1f}s audio, transcribed in {took:.1f}s, "
-                      f"{utterances.qsize()} queued")
+            timing = (
+                f"{length:.1f}s audio, transcribed in {took:.1f}s, "
+                f"{utterances.qsize()} queued"
+            )
+
             if not text:
                 log(f"(nothing recognised; {timing})")
                 continue
+
             log(f'heard: "{raw}" ({timing})')
 
             if wake:
                 if not text.startswith(wake):
                     continue
-                text = text[len(wake):].strip()
+
+                text = text[len(wake) :].strip()
                 raw = wake_re.sub("", raw, count=1)
 
             hit = matcher.match(text, raw)
             if not hit:
                 log("  no matching command")
                 continue
+
             label, cmd, params = hit
             log(f'  -> "{label}" {params or ""}')
             for action in cmd["actions"]:
                 executor.run(action, params)
+
     except KeyboardInterrupt:
         pass
+
     finally:
         stop.set()

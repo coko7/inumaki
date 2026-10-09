@@ -15,7 +15,8 @@ def list_devices():
     out = subprocess.run(
         ["pactl", "list", "sources", "short"], capture_output=True, text=True
     ).stdout
-    print("Available sources (use the 2nd column as `device`):\n")
+
+    print("Available sources:\n")
     for line in out.splitlines():
         cols = line.split("\t")
         if len(cols) >= 2 and not cols[1].endswith(".monitor"):
@@ -30,10 +31,19 @@ def rms(frame_bytes):
 
 def capture(device, settings, out_q, stop):
     """Read mic, push complete utterances (float32 arrays) onto out_q."""
-    cmd = ["parec", "--format=s16le", f"--rate={SAMPLE_RATE}", "--channels=1",
-           "--raw", "--latency-msec=30"]
+
+    cmd = [
+        "parec",
+        "--format=s16le",
+        f"--rate={SAMPLE_RATE}",
+        "--channels=1",
+        "--raw",
+        "--latency-msec=30",
+    ]
+
     if device:
         cmd.append(f"--device={device}")
+
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
 
     def read_frame():
@@ -65,14 +75,17 @@ def capture(device, settings, out_q, stop):
                 if is_loud:
                     voiced, buf, quiet, loud = True, list(preroll), 0, 1
                 continue
+
             buf.append(frame)
             loud += is_loud
             quiet = 0 if is_loud else quiet + 1
             if quiet >= silence_frames or len(buf) >= max_frames:
                 if loud >= min_frames:
                     if len(buf) >= max_frames:
-                        log(f"  utterance hit max_utterance_s; background noise "
-                            f"may be above threshold {threshold:.0f}")
+                        log(
+                            f"  utterance hit max_utterance_s; background noise "
+                            f"may be above threshold {threshold:.0f}"
+                        )
                     pcm = np.frombuffer(b"".join(buf), dtype=np.int16)
                     out_q.put(pcm.astype(np.float32) / 32768.0)
                 voiced = False
