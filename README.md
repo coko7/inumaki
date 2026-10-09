@@ -101,6 +101,14 @@ You can list all your audio input devices with this:
 | `-m, --model NAME` | Override the Whisper model |
 | `--list-devices` | List microphones and exit |
 | `--dry-run` | Print actions instead of performing them |
+| `-t, --text` | Type what you'd say instead of using the mic (no Whisper model loaded) |
+
+To try out your commands without speaking, combine the last two:
+
+```bash
+./run.sh --text --dry-run
+> open firefox
+```
 
 ## Default commands
 
