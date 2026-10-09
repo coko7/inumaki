@@ -1,8 +1,14 @@
 import collections
+import math
+import queue
 import subprocess
+import threading
+from typing import IO, cast
 
 import numpy as np
+import numpy.typing as npt
 
+from .config import Settings
 from .util import log
 
 SAMPLE_RATE = 16000
@@ -10,10 +16,16 @@ FRAME_MS = 30
 FRAME_SAMPLES = SAMPLE_RATE * FRAME_MS // 1000
 FRAME_BYTES = FRAME_SAMPLES * 2  # s16le mono
 
+# One utterance: mono float32 samples in [-1, 1] at SAMPLE_RATE.
+Audio = npt.NDArray[np.float32]
 
-def list_devices():
+
+def list_devices() -> None:
     out = subprocess.run(
-        ["pactl", "list", "sources", "short"], capture_output=True, text=True
+        ["pactl", "list", "sources", "short"],
+        check=False,
+        capture_output=True,
+        text=True,
     ).stdout
 
     print("Available sources:\n")
@@ -24,12 +36,17 @@ def list_devices():
     print("\nMonitors (system output loopback) omitted.")
 
 
-def rms(frame_bytes):
+def rms(frame_bytes: bytes) -> float:
     samples = np.frombuffer(frame_bytes, dtype=np.int16).astype(np.float32)
-    return float(np.sqrt(np.mean(samples * samples))) if samples.size else 0.0
+    return math.sqrt(float(np.mean(samples * samples))) if samples.size else 0.0
 
 
-def capture(device, settings, out_q, stop):
+def capture(
+    device: str,
+    settings: Settings,
+    out_q: queue.Queue[Audio | None],
+    stop: threading.Event,
+) -> None:
     """Read mic, push complete utterances (float32 arrays) onto out_q."""
 
     cmd = [
@@ -45,9 +62,12 @@ def capture(device, settings, out_q, stop):
         cmd.append(f"--device={device}")
 
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    # typeshed types Popen.stdout as IO[Any]; without text=True it's bytes.
+    stdout = cast(IO[bytes] | None, proc.stdout)
+    assert stdout is not None  # always set with stdout=PIPE
 
-    def read_frame():
-        data = proc.stdout.read(FRAME_BYTES)
+    def read_frame() -> bytes:
+        data = stdout.read(FRAME_BYTES)
         if not data or len(data) < FRAME_BYTES:
             raise RuntimeError("audio stream ended (bad device name?)")
         return data
@@ -63,9 +83,10 @@ def capture(device, settings, out_q, stop):
     silence_frames = settings["silence_ms"] // FRAME_MS
     min_frames = settings["min_speech_ms"] // FRAME_MS
     max_frames = settings["max_utterance_s"] * 1000 // FRAME_MS
-    preroll = collections.deque(maxlen=300 // FRAME_MS)
+    preroll: collections.deque[bytes] = collections.deque(maxlen=300 // FRAME_MS)
 
-    voiced, buf, quiet, loud = False, [], 0, 0
+    buf: list[bytes] = []
+    voiced, quiet, loud = False, 0, 0
     try:
         while not stop.is_set():
             frame = read_frame()
@@ -83,11 +104,11 @@ def capture(device, settings, out_q, stop):
                 if loud >= min_frames:
                     if len(buf) >= max_frames:
                         log(
-                            f"  utterance hit max_utterance_s; background noise "
-                            f"may be above threshold {threshold:.0f}"
+                            "  utterance hit max_utterance_s; background noise "
+                            + f"may be above threshold {threshold:.0f}"
                         )
                     pcm = np.frombuffer(b"".join(buf), dtype=np.int16)
-                    out_q.put(pcm.astype(np.float32) / 32768.0)
+                    out_q.put(pcm.astype(np.float32) / np.float32(32768.0))
                 voiced = False
                 preroll.clear()
     finally:

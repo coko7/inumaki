@@ -1,10 +1,15 @@
 import time
+from typing import TYPE_CHECKING
 
-from .audio import SAMPLE_RATE
+from .audio import SAMPLE_RATE, Audio
+from .config import Command, Settings
 from .util import log, normalize
 
+if TYPE_CHECKING:
+    from faster_whisper import WhisperModel  # pyright: ignore[reportMissingTypeStubs]
 
-def build_prompt(settings, commands):
+
+def build_prompt(settings: Settings, commands: list[Command]) -> str:
     """Words that bias recognition toward known commands.
 
     Unique words only: a long phrase list gets parroted back by Whisper
@@ -27,21 +32,23 @@ def build_prompt(settings, commands):
 
 
 class Transcriber:
-    def __init__(self, settings, commands):
-        from faster_whisper import WhisperModel  # slow import
+    def __init__(self, settings: Settings, commands: list[Command]):
+        # Slow import, so it only happens once the model is actually needed.
+        from faster_whisper import WhisperModel  # pyright: ignore[reportMissingTypeStubs]
 
-        self.settings = settings
+        self.settings: Settings = settings
         log(f"Loading model {settings['model']} ({settings['compute_type']})...")
-        self.model = WhisperModel(
+        self.model: WhisperModel = WhisperModel(
             settings["model"], device="auto", compute_type=settings["compute_type"]
         )
-        self.prompt = build_prompt(settings, commands)
+        self.prompt: str = build_prompt(settings, commands)
         log(f"Prompt: {self.prompt!r}")
 
-    def __call__(self, audio):
+    def __call__(self, audio: Audio) -> tuple[str, float, float]:
         """Return (transcript, seconds taken, audio length in seconds)."""
         started = time.monotonic()
-        segments, _ = self.model.transcribe(
+        # faster_whisper types `vad_parameters` as a bare `dict`, hence the ignore.
+        segments, _ = self.model.transcribe(  # pyright: ignore[reportUnknownMemberType]
             audio,
             language=self.settings["language"] or None,
             beam_size=self.settings["beam_size"],
@@ -52,6 +59,6 @@ class Transcriber:
             initial_prompt=self.prompt or None,
         )
         # transcribe() is lazy; decoding happens while consuming segments.
-        segments = [s for s in segments if s.no_speech_prob < 0.6]
-        text = " ".join(s.text.strip() for s in segments).strip()
+        kept = [s for s in segments if s.no_speech_prob < 0.6]
+        text = " ".join(s.text.strip() for s in kept).strip()
         return text, time.monotonic() - started, len(audio) / SAMPLE_RATE

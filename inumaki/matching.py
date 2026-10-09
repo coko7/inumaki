@@ -1,7 +1,11 @@
 import difflib
 import re
 
+from .config import Command
 from .util import normalize
+
+# (label, command, placeholder values from the pattern's named groups)
+Match = tuple[str, Command, dict[str, str]]
 
 
 class Matcher:
@@ -11,10 +15,12 @@ class Matcher:
     pattern's named groups.
     """
 
-    def __init__(self, commands, fuzzy_cutoff):
-        self.fuzzy_cutoff = fuzzy_cutoff
-        self.entries = []  # (normalized phrase, command)
-        self.patterns = []  # (compiled regex, command, match raw text?)
+    def __init__(self, commands: list[Command], fuzzy_cutoff: float):
+        self.fuzzy_cutoff: float = fuzzy_cutoff
+        # (normalized phrase, command)
+        self.entries: list[tuple[str, Command]] = []
+        # (compiled regex, command, match raw text?)
+        self.patterns: list[tuple[re.Pattern[str], Command, bool]] = []
 
         for cmd in commands:
             for phrase in cmd.get("phrases", []):
@@ -25,7 +31,7 @@ class Matcher:
                 flags = re.IGNORECASE if raw else 0
                 self.patterns.append((re.compile(cmd["pattern"], flags), cmd, raw))
 
-    def match(self, text, raw_text):
+    def match(self, text: str, raw_text: str) -> Match | None:
         # A phrase that is the whole utterance always wins ("open terminal").
         for phrase, cmd in self.entries:
             if phrase == text:
@@ -35,7 +41,7 @@ class Matcher:
         for regex, cmd, raw in self.patterns:
             matched = regex.search(raw_text if raw else text)
             if matched:
-                return regex.pattern, cmd, matched.groupdict()
+                return regex.pattern, cmd, matched.groupdict(default="")
 
         padded = f" {text} "
         contained = [
@@ -46,11 +52,13 @@ class Matcher:
             phrase, cmd = max(contained, key=lambda e: len(e[0]))
             return phrase, cmd, {}
 
-        best, best_score = None, 0.0
+        best: Match | None = None
+        best_score = 0.0
 
         for phrase, cmd in self.entries:
             score = difflib.SequenceMatcher(None, phrase, text).ratio()
             if score > best_score:
-                best, best_score = (phrase, cmd, {}), score
+                best = phrase, cmd, {}
+                best_score = score
 
         return best if best_score >= self.fuzzy_cutoff else None

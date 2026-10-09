@@ -7,8 +7,8 @@ from pathlib import Path
 
 from . import __doc__ as description
 from .actions import Executor
-from .audio import capture, list_devices
-from .config import load_config
+from .audio import Audio, capture, list_devices
+from .config import Settings, load_config
 from .matching import Matcher
 from .transcribe import Transcriber
 from .util import log, normalize
@@ -16,23 +16,36 @@ from .util import log, normalize
 REPO_DIR = Path(__file__).resolve().parent.parent
 
 
-def parse_args():
+class Args(argparse.Namespace):
+    """Typed view of the parsed command line."""
+
+    config: Path = REPO_DIR / "config.toml"
+    device: str | None = None
+    model: str | None = None
+    list_devices: bool = False
+    dry_run: bool = False
+
+
+def parse_args() -> Args:
     ap = argparse.ArgumentParser(prog="inumaki", description=description)
-    ap.add_argument("-c", "--config", default=REPO_DIR / "config.toml")
-    ap.add_argument("-d", "--device", help="pactl source name (overrides config)")
-    ap.add_argument("-m", "--model", help="whisper model (overrides config)")
-    ap.add_argument("--list-devices", action="store_true")
-    ap.add_argument("--dry-run", action="store_true", help="print actions only")
-    return ap.parse_args()
+    _ = ap.add_argument("-c", "--config", type=Path)
+    _ = ap.add_argument("-d", "--device", help="pactl source name (overrides config)")
+    _ = ap.add_argument("-m", "--model", help="whisper model (overrides config)")
+    _ = ap.add_argument("--list-devices", action="store_true")
+    _ = ap.add_argument("--dry-run", action="store_true", help="print actions only")
+    return ap.parse_args(namespace=Args())
 
 
-def start_capture(settings):
+def start_capture(
+    settings: Settings,
+) -> tuple[queue.Queue[Audio | None], threading.Event, list[Exception]]:
     """Run capture in a thread; the queue yields utterances, or None on failure."""
-    utterances = queue.Queue()
-    stop = threading.Event()
-    errors = []
 
-    def run():
+    utterances: queue.Queue[Audio | None] = queue.Queue()
+    stop = threading.Event()
+    errors: list[Exception] = []
+
+    def run() -> None:
         try:
             capture(settings["device"], settings, utterances, stop)
         except Exception as e:
@@ -43,7 +56,7 @@ def start_capture(settings):
     return utterances, stop, errors
 
 
-def main():
+def main() -> None:
     args = parse_args()
     if args.list_devices:
         list_devices()
@@ -66,10 +79,8 @@ def main():
     transcribe = Transcriber(settings, commands)
 
     utterances, stop, errors = start_capture(settings)
-    log(
-        f"Listening on {settings['device'] or 'default source'} "
-        f"(backend: {executor.backend}). Ctrl+C to quit."
-    )
+    device = settings["device"] or "default source"
+    log(f"Listening on {device} (backend: {executor.backend}). Ctrl+C to quit.")
 
     try:
         while True:
