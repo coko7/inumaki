@@ -123,6 +123,20 @@ actions = [{ type = "key", keys = "57:1 57:0" }] # KEY_SPACE (xdotool: "space")
 phrases = ["submit", "press enter"]
 actions = [{ type = "key", keys = "28:1 28:0" }] # KEY_ENTER (xdotool: "Return")
 
+# Close the focused window (Hyprland). With a Lua Hyprland config, use instead:
+#   hyprctl dispatch 'hl.dsp.window.close()'
+# Other compositors: e.g. "swaymsg kill", or on X11 "xdotool getactivewindow windowclose".
+[[command]]
+phrases = ["close window", "close this window", "close the window", "kill window"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch killactive" }]
+
+# Toggle fullscreen on the focused window (Hyprland). With a Lua Hyprland config:
+#   hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" })'
+# Other compositors: e.g. "swaymsg fullscreen toggle".
+[[command]]
+phrases = ["fullscreen", "full screen", "toggle fullscreen", "exit fullscreen"]
+actions = [{ type = "shell", cmd = "hyprctl dispatch fullscreen" }]
+
 # Hyprland workspaces. Whisper may write digits or words, and mishear
 # "two"/"four"/"eight" as "to"/"for"/"ate", so all variants are listed.
 # With a Lua Hyprland config, use instead:

@@ -125,6 +125,8 @@ To try out your commands without speaking, combine the last two:
 | "type Hello, world" | Type `Hello, world` |
 | "submit", "press enter" | Press Enter |
 | "space" | Press Space |
+| "close window", "close this window" | Close the focused window (Hyprland) |
+| "fullscreen", "exit fullscreen" | Toggle fullscreen on the focused window (Hyprland) |
 | "workspace 3" | Switch Hyprland workspace (1-10) |
 
 Commands match anywhere in the sentence, so "move the mouse to the top
