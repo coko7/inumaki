@@ -50,6 +50,8 @@ class Dispatcher:
         self.executor: Executor = executor
         self.matcher: Matcher = Matcher(commands, settings["fuzzy_cutoff"])
         self.wake: str = normalize(settings["wake_word"])
+        # Last command run and its placeholder values, for the "repeat" action.
+        self.last: tuple[Command, dict[str, str]] | None = None
 
         # Same prefix on the raw transcript, tolerating punctuation ("Computer, ...").
         self.wake_re: re.Pattern[str] = re.compile(
@@ -73,6 +75,24 @@ class Dispatcher:
 
         label, cmd, params = hit
         log(f'  -> "{label}" {params or ""}')
+        repeats = any(action["type"] == "repeat" for action in cmd["actions"])
+        if not repeats:
+            # Commands that repeat aren't remembered, so "again" twice in a
+            # row re-runs the same real command rather than itself.
+            self.last = cmd, params
+
+        for action in cmd["actions"]:
+            if action["type"] == "repeat":
+                self._repeat()
+            else:
+                self.executor.run(action, params)
+
+    def _repeat(self) -> None:
+        if self.last is None:
+            log("  nothing to repeat yet")
+            return
+
+        cmd, params = self.last
         for action in cmd["actions"]:
             self.executor.run(action, params)
 

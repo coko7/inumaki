@@ -64,6 +64,9 @@ How one utterance flows through it:
 2. Add it to the `Action` union and to `ACTION_TYPES`.
 3. Handle it in `Executor.run` in `actions.py`. Compare `action["type"]`
    directly so the type checker narrows `action` to your TypedDict.
+   Exception: actions that need command history, like `repeat`, are
+   handled in `cli.Dispatcher` instead, because `Executor` only sees one
+   action at a time.
 4. Document it in the README's Actions table and in
    `config.example.toml`.
 

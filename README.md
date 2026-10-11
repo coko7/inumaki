@@ -125,6 +125,8 @@ To try out your commands without speaking, combine the last two:
 | "type Hello, world" | Type `Hello, world` |
 | "submit", "press enter" | Press Enter |
 | "space" | Press Space |
+| "new line" | Press Shift+Enter (line break without sending in chat apps) |
+| "again", "repeat that" | Run the previous command again |
 | "close window", "close this window" | Close the focused window (Hyprland) |
 | "fullscreen", "exit fullscreen" | Toggle fullscreen on the focused window (Hyprland) |
 | "workspace 3" | Switch Hyprland workspace (1-10) |
@@ -196,6 +198,7 @@ actions = [
 | `shell` | `cmd` | Runs in the background via `sh` |
 | `launch` | `app` | Fuzzy-matched against installed `.desktop` files |
 | `sleep` | `ms` | |
+| `repeat` | | Runs the previous command again, with the same captured text |
 
 Key codes for ydotool are Linux input event codes, listed in
 `/usr/include/linux/input-event-codes.h`.

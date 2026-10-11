@@ -43,6 +43,7 @@ launcher = "gtk-launch {id}" # or "uwsm app -- {id}.desktop"
 #   shell          cmd
 #   launch         app          spoken app name, fuzzy-matched to installed .desktop files
 #   sleep          ms
+#   repeat                      re-run the previous command (with the same captured text)
 
 [[command]]
 phrases = ["top left", "mouse top left"]
@@ -122,6 +123,16 @@ actions = [{ type = "key", keys = "57:1 57:0" }] # KEY_SPACE (xdotool: "space")
 [[command]]
 phrases = ["submit", "press enter"]
 actions = [{ type = "key", keys = "28:1 28:0" }] # KEY_ENTER (xdotool: "Return")
+
+# Shift+Enter: a line break that doesn't send in chat apps, and a normal
+# new line in editors.
+[[command]]
+phrases = ["new line", "newline", "next line"]
+actions = [{ type = "key", keys = "42:1 28:1 28:0 42:0" }] # KEY_LEFTSHIFT+KEY_ENTER (xdotool: "shift+Return")
+
+[[command]]
+phrases = ["again", "repeat", "repeat that", "do it again", "one more time"]
+actions = [{ type = "repeat" }]
 
 # Close the focused window (Hyprland). With a Lua Hyprland config, use instead:
 #   hyprctl dispatch 'hl.dsp.window.close()'

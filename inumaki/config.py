@@ -96,6 +96,12 @@ class SleepAction(TypedDict):
     ms: NotRequired[float]
 
 
+class RepeatAction(TypedDict):
+    """Re-run the previous command. Handled by cli.Dispatcher, not Executor."""
+
+    type: Literal["repeat"]
+
+
 Action = (
     MoveAction
     | MoveRelativeAction
@@ -106,6 +112,7 @@ Action = (
     | ShellAction
     | LaunchAction
     | SleepAction
+    | RepeatAction
 )
 
 # Keep in sync with the `type` literals above.
@@ -120,6 +127,7 @@ ACTION_TYPES: frozenset[str] = frozenset(
         "shell",
         "launch",
         "sleep",
+        "repeat",
     }
 )
 
