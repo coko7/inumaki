@@ -148,6 +148,55 @@ actions = [{ type = "shell", cmd = "hyprctl dispatch killactive" }]
 phrases = ["fullscreen", "full screen", "toggle fullscreen", "exit fullscreen"]
 actions = [{ type = "shell", cmd = "hyprctl dispatch fullscreen" }]
 
+# Media: playerctl controls the active player (Spotify, browser, mpv, ...),
+# wpctl the PipeWire default output. Volume is capped at 100% (-l 1.0).
+# On PulseAudio without wpctl, use e.g. "pactl set-sink-volume @DEFAULT_SINK@ +10%".
+
+[[command]]
+phrases = ["play", "resume", "play music"]
+actions = [{ type = "shell", cmd = "playerctl play" }]
+
+[[command]]
+phrases = ["pause", "pause music"]
+actions = [{ type = "shell", cmd = "playerctl pause" }]
+
+[[command]]
+phrases = ["play pause", "toggle music"]
+actions = [{ type = "shell", cmd = "playerctl play-pause" }]
+
+[[command]]
+phrases = ["stop music", "stop playback"]
+actions = [{ type = "shell", cmd = "playerctl stop" }]
+
+[[command]]
+phrases = ["next track", "next song", "skip song", "skip track"]
+actions = [{ type = "shell", cmd = "playerctl next" }]
+
+[[command]]
+phrases = ["previous track", "previous song", "last song", "last track"]
+actions = [{ type = "shell", cmd = "playerctl previous" }]
+
+[[command]]
+phrases = ["volume up", "louder", "turn it up"]
+actions = [{ type = "shell", cmd = "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 10%+" }]
+
+[[command]]
+phrases = ["volume down", "quieter", "turn it down"]
+actions = [{ type = "shell", cmd = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%-" }]
+
+# "volume 50", "set volume to 50%", "volume 30 percent"
+[[command]]
+pattern = '^(?:set )?(?:the )?volume (?:to )?(?P<level>\d{1,3}) ?(?:%|percent)?$'
+actions = [{ type = "shell", cmd = "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ {level}%" }]
+
+[[command]]
+phrases = ["mute", "mute sound", "mute audio"]
+actions = [{ type = "shell", cmd = "wpctl set-mute @DEFAULT_AUDIO_SINK@ 1" }]
+
+[[command]]
+phrases = ["unmute", "unmute sound", "unmute audio"]
+actions = [{ type = "shell", cmd = "wpctl set-mute @DEFAULT_AUDIO_SINK@ 0" }]
+
 # Hyprland workspaces. Whisper may write digits or words, and mishear
 # "two"/"four"/"eight" as "to"/"for"/"ate", so all variants are listed.
 # With a Lua Hyprland config, use instead:

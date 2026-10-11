@@ -42,7 +42,8 @@ For now, these are the supported actions:
 - Linux with PipeWire or PulseAudio (`parec` must be available)
 - Python 3.11+
 - **Optional:** `gtk-launch` (for "open X"), `hyprctl` (for the Hyprland
-  workspace commands)
+  window and workspace commands), `playerctl` and `wpctl` (for the media
+  and volume commands)
 
 ### For Wayland users only
 
@@ -129,6 +130,9 @@ To try out your commands without speaking, combine the last two:
 | "again", "repeat that" | Run the previous command again |
 | "close window", "close this window" | Close the focused window (Hyprland) |
 | "fullscreen", "exit fullscreen" | Toggle fullscreen on the focused window (Hyprland) |
+| "play", "pause", "next song", "previous track", "stop music" | Control the active media player (`playerctl`) |
+| "volume up/down", "louder", "quieter", "mute", "unmute" | Change output volume (`wpctl`) |
+| "volume 50", "set volume to 30%" | Set output volume to that level (max 100) |
 | "workspace 3" | Switch Hyprland workspace (1-10) |
 
 Commands match anywhere in the sentence, so "move the mouse to the top
