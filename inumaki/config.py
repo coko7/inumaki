@@ -102,6 +102,13 @@ class RepeatAction(TypedDict):
     type: Literal["repeat"]
 
 
+class ListeningAction(TypedDict):
+    """Pause (false) or resume (true) acting on speech. Handled by cli.Dispatcher."""
+
+    type: Literal["listening"]
+    enabled: bool
+
+
 Action = (
     MoveAction
     | MoveRelativeAction
@@ -113,6 +120,7 @@ Action = (
     | LaunchAction
     | SleepAction
     | RepeatAction
+    | ListeningAction
 )
 
 # Keep in sync with the `type` literals above.
@@ -128,6 +136,7 @@ ACTION_TYPES: frozenset[str] = frozenset(
         "launch",
         "sleep",
         "repeat",
+        "listening",
     }
 )
 

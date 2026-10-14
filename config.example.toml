@@ -44,6 +44,17 @@ launcher = "gtk-launch {id}" # or "uwsm app -- {id}.desktop"
 #   launch         app          spoken app name, fuzzy-matched to installed .desktop files
 #   sleep          ms
 #   repeat                      re-run the previous command (with the same captured text)
+#   listening      enabled      false = pause: ignore everything except commands that resume
+
+# Pause/resume. Kept first so their words are always in the recognition
+# hint: while paused, "start listening" is the only thing that works.
+[[command]]
+phrases = ["stop listening", "pause listening", "go to sleep"]
+actions = [{ type = "listening", enabled = false }]
+
+[[command]]
+phrases = ["start listening", "resume listening", "wake up"]
+actions = [{ type = "listening", enabled = true }]
 
 [[command]]
 phrases = ["top left", "mouse top left"]

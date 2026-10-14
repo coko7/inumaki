@@ -114,4 +114,7 @@ class AppIndex:
                 if score > best_score:
                     best, best_score = (app_id, name), score
 
-        return best if best_score >= 0.6 else None
+        # Real mishearings ("dolfin", "obsidion") score ~0.77+, while unrelated
+        # words reach ~0.6 against some keyword ("listing" vs Kdenlive's
+        # "editing"), so stay well above that.
+        return best if best_score >= 0.75 else None

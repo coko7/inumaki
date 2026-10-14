@@ -117,6 +117,8 @@ To try out your commands without speaking, combine the last two:
 
 | Say | Does |
 | --- | --- |
+| "stop listening", "go to sleep" | Pause: ignore everything until "start listening" |
+| "start listening", "wake up" | Resume acting on what you say |
 | "top left", "bottom right", "center", ... | Move the mouse there |
 | "move up/down/left/right" | Nudge the mouse 100 px |
 | "click", "double click", "right click" | Click |
@@ -203,6 +205,7 @@ actions = [
 | `launch` | `app` | Fuzzy-matched against installed `.desktop` files |
 | `sleep` | `ms` | |
 | `repeat` | | Runs the previous command again, with the same captured text |
+| `listening` | `enabled` | `false` pauses: only commands with `enabled = true` still match |
 
 Key codes for ydotool are Linux input event codes, listed in
 `/usr/include/linux/input-event-codes.h`.
@@ -216,7 +219,9 @@ valid types, so typos in `config.toml` show up immediately.
   clips hit `max_utterance_s`, background noise is above the threshold:
   raise `energy_threshold`. If transcription itself is slow, use a smaller
   model (`base.en`).
-- **Commands fire during normal conversation.** Set a `wake_word`.
+- **Commands fire during normal conversation.** Say "stop listening"
+  before a call or video and "start listening" after, or set a
+  `wake_word` so only sentences starting with it count.
 - **Absolute mouse moves land in the wrong place (Wayland).** ydotool
   moves the pointer relatively, so pointer acceleration distorts it. Use a
   flat acceleration profile for the ydotool virtual device.

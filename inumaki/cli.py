@@ -43,12 +43,33 @@ def parse_args() -> Args:
     return ap.parse_args(namespace=Args())
 
 
+def resumes_listening(cmd: Command) -> bool:
+    return any(
+        action["type"] == "listening" and action["enabled"] for action in cmd["actions"]
+    )
+
+
+def is_meta(cmd: Command) -> bool:
+    """Commands about inumaki itself, which "repeat" must not re-run."""
+    return any(action["type"] in ("repeat", "listening") for action in cmd["actions"])
+
+
 class Dispatcher:
-    """Turns one transcript into actions: wake word, matching, execution."""
+    """Turns one transcript into actions: wake word, matching, execution.
+
+    Also owns the actions that need state across utterances: "repeat"
+    and "listening".
+    """
 
     def __init__(self, settings: Settings, commands: list[Command], executor: Executor):
         self.executor: Executor = executor
         self.matcher: Matcher = Matcher(commands, settings["fuzzy_cutoff"])
+        # While paused, only commands that turn listening back on can match.
+        self.resume_matcher: Matcher = Matcher(
+            [cmd for cmd in commands if resumes_listening(cmd)],
+            settings["fuzzy_cutoff"],
+        )
+        self.listening: bool = True
         self.wake: str = normalize(settings["wake_word"])
         # Last command run and its placeholder values, for the "repeat" action.
         self.last: tuple[Command, dict[str, str]] | None = None
@@ -68,24 +89,33 @@ class Dispatcher:
             text = text[len(self.wake) :].strip()
             raw = self.wake_re.sub("", raw, count=1)
 
-        hit = self.matcher.match(text, raw)
+        matcher = self.matcher if self.listening else self.resume_matcher
+        hit = matcher.match(text, raw)
         if not hit:
-            log("  no matching command")
+            log("  no matching command" if self.listening else "  (paused, ignored)")
             return
 
         label, cmd, params = hit
         log(f'  -> "{label}" {params or ""}')
-        repeats = any(action["type"] == "repeat" for action in cmd["actions"])
-        if not repeats:
-            # Commands that repeat aren't remembered, so "again" twice in a
-            # row re-runs the same real command rather than itself.
+        if not is_meta(cmd):
+            # "again" twice in a row re-runs the same real command, and never
+            # re-runs a pause/resume.
             self.last = cmd, params
 
         for action in cmd["actions"]:
             if action["type"] == "repeat":
                 self._repeat()
+            elif action["type"] == "listening":
+                self._set_listening(action["enabled"])
             else:
                 self.executor.run(action, params)
+
+    def _set_listening(self, enabled: bool) -> None:
+        self.listening = enabled
+        if enabled:
+            log("  listening again")
+        else:
+            log("  paused: only commands that resume listening are accepted")
 
     def _repeat(self) -> None:
         if self.last is None:
