@@ -24,6 +24,7 @@ energy_threshold = 0         # 0 = auto-calibrate at startup
 fuzzy_cutoff = 0.8
 screen = [1920, 1080]        # your resolution; needed for "%" coordinates
 launcher = "gtk-launch {id}" # or "uwsm app -- {id}.desktop"
+dictation_model = "small"    # multilingual model for `dictate` commands ("french ..."); "medium" is more accurate
 
 # A command has `phrases` (matched anywhere in the utterance) and/or a
 # `pattern` (Python regex on lowercased, punctuation-free text; add
@@ -32,6 +33,9 @@ launcher = "gtk-launch {id}" # or "uwsm app -- {id}.desktop"
 # Priority: phrase equal to the whole utterance > pattern > phrase contained
 # in the utterance > fuzzy phrase. So "open terminal" beats "open X", and
 # "type double click" types instead of double-clicking.
+# `dictate = { language = "fr", after = "french" }` re-transcribes the
+# speech after the word "french" in that language and puts it in the
+# `{text}` placeholder (set `into = "name"` for another placeholder).
 #
 # Action types:
 #   move           x, y         absolute; ints or "50%". Huge values clamp to the edge.
@@ -119,6 +123,18 @@ actions = [{ type = "shell", cmd = "xdg-terminal-exec || kitty || alacritty" }]
 [[command]]
 pattern = '^(?:please )?(?:open|launch|start) (?:up )?(?:the |an? )?(?P<app>.+?)(?: please)?$'
 actions = [{ type = "launch", app = "{app}" }]
+
+# "french, bonjour à tous" (or "in french ...", "type french ...") -> types
+# "bonjour à tous". The English model only catches the trigger; `dictate`
+# re-transcribes what follows "french" with `dictation_model`
+# (multilingual) in French. Must come before the plain "type" pattern
+# below. Saying "french" alone
+# makes the next sentence (within 15 s) the French text, so pausing is fine.
+[[command]]
+pattern = '^\W*(?:(?:type|write)\W+)?(?:in\W+)?french\b\W*(?P<text>.*?)\.?$'
+raw = true
+dictate = { language = "fr", after = "french" }
+actions = [{ type = "type", text = "{text}" }]
 
 # "type Hello, world" -> types "Hello, world" (keeps Whisper's casing and
 # punctuation, drops the trailing period Whisper adds to sentences).

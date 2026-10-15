@@ -40,7 +40,7 @@ inumaki/
     ├── cli.py             # arguments, capture thread, main loop
     ├── config.py          # default settings, config types, loading config.toml
     ├── audio.py           # mic capture with parec, speech segmenting, --list-devices
-    ├── transcribe.py      # Whisper model and recognition hint (`prompt`)
+    ├── transcribe.py      # Whisper models, recognition hint (`prompt`), dictation
     ├── matching.py        # phrase / pattern / fuzzy matching
     ├── actions.py         # mouse, keys, typing, shell, launch
     ├── apps.py            # finding installed apps from .desktop files
@@ -57,6 +57,15 @@ How one utterance flows through it:
    from stdin instead and steps 1–2 are skipped.
 3. `cli.Dispatcher` strips the wake word, `matching.Matcher` finds the
    command, then `actions.Executor` runs its actions.
+
+   If the command has `dictate`, the Dispatcher first replaces a
+   placeholder. `Transcriber.cut_after` runs the English model again
+   with word timestamps to find where the trigger word ends.
+   `transcribe.Dictation` then transcribes the rest of the clip in the
+   requested language; both are set on the Dispatcher in `listen_mic`.
+   If the trigger came alone, the command waits in `Dispatcher.pending`
+   and `listen_mic` sends the next clip straight to `Dictation`, skipping
+   the English pass.
 
 ## Adding an action type
 

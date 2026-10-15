@@ -3,17 +3,21 @@ import queue
 import re
 import sys
 import threading
+import time
+from collections.abc import Callable
 from pathlib import Path
 
 from . import __doc__ as description
 from .actions import Executor
 from .audio import Audio, capture, list_devices
-from .config import Command, Settings, load_config
+from .config import Command, Dictate, Settings, load_config
 from .matching import Matcher
-from .transcribe import Transcriber
+from .transcribe import Dictation, Transcriber
 from .util import log, normalize
 
 REPO_DIR = Path(__file__).resolve().parent.parent
+# After a bare "type french", how long the next utterance counts as dictation.
+DICTATION_WAIT_S = 15
 
 
 class Args(argparse.Namespace):
@@ -58,7 +62,7 @@ class Dispatcher:
     """Turns one transcript into actions: wake word, matching, execution.
 
     Also owns the actions that need state across utterances: "repeat"
-    and "listening".
+    and "listening", and re-transcribing commands with `dictate`.
     """
 
     def __init__(self, settings: Settings, commands: list[Command], executor: Executor):
@@ -73,6 +77,14 @@ class Dispatcher:
         self.wake: str = normalize(settings["wake_word"])
         # Last command run and its placeholder values, for the "repeat" action.
         self.last: tuple[Command, dict[str, str]] | None = None
+        # Set in mic mode for `dictate` commands:
+        # (audio, trigger words) -> the audio after them, or None if not found
+        self.cut_after: Callable[[Audio, str], Audio | None] | None = None
+        # (audio, language) -> transcript in that language
+        self.dictation: Callable[[Audio, str], str] | None = None
+        # A `dictate` command said without text ("type french"), waiting for
+        # the next utterance: (command, params, dictate spec, since)
+        self.pending: tuple[Command, dict[str, str], Dictate, float] | None = None
 
         # Same prefix on the raw transcript, tolerating punctuation ("Computer, ...").
         self.wake_re: re.Pattern[str] = re.compile(
@@ -80,7 +92,7 @@ class Dispatcher:
             re.IGNORECASE,
         )
 
-    def __call__(self, raw: str) -> None:
+    def __call__(self, raw: str, audio: Audio | None = None) -> None:
         text = normalize(raw)
         if self.wake:
             if not text.startswith(self.wake):
@@ -97,6 +109,42 @@ class Dispatcher:
 
         label, cmd, params = hit
         log(f'  -> "{label}" {params or ""}')
+        if "dictate" in cmd:
+            dictate = cmd["dictate"]
+            if not params.get(dictate.get("into", "text")):
+                # Paused after the trigger: the text comes as its own utterance.
+                self.pending = cmd, params, dictate, time.monotonic()
+                log(f'  say the {dictate["language"]} text now ({DICTATION_WAIT_S}s)')
+                return
+            params = self._dictate(dictate, params, audio)
+
+        self._run(cmd, params)
+
+    def waiting_dictation(self) -> Dictate | None:
+        """The dictate spec if the next utterance should be dictated."""
+        if self.pending is None:
+            return None
+        if time.monotonic() - self.pending[3] > DICTATION_WAIT_S:
+            log("  (dictation timed out)")
+            self.pending = None
+            return None
+        return self.pending[2]
+
+    def finish_dictation(self, text: str) -> None:
+        """Run the pending `dictate` command with `text` as its dictated text."""
+        if self.pending is None:
+            return
+        cmd, params, dictate, _ = self.pending
+        self.pending = None
+
+        # Drop the period Whisper adds to sentences, like the "type" pattern does.
+        text = text.strip().removesuffix(".")
+        if not text:
+            log("  nothing dictated")
+            return
+        self._run(cmd, {**params, dictate.get("into", "text"): text})
+
+    def _run(self, cmd: Command, params: dict[str, str]) -> None:
         if not is_meta(cmd):
             # "again" twice in a row re-runs the same real command, and never
             # re-runs a pause/resume.
@@ -109,6 +157,30 @@ class Dispatcher:
                 self._set_listening(action["enabled"])
             else:
                 self.executor.run(action, params)
+
+    def _dictate(
+        self, dictate: Dictate, params: dict[str, str], audio: Audio | None
+    ) -> dict[str, str]:
+        """Replace the dictated placeholder with the other-language transcript."""
+        if audio is None or self.cut_after is None or self.dictation is None:
+            log("  (no audio in --text mode: using the text as given)")
+            return params
+
+        started = time.monotonic()
+        rest = self.cut_after(audio, dictate["after"])
+        text = "" if rest is None else self.dictation(rest, dictate["language"])
+        if not text:
+            log(
+                f'  nothing dictated after "{dictate["after"]}"; '
+                + "using the English transcript"
+            )
+            return params
+
+        # Drop the period Whisper adds to sentences, like the "type" pattern does.
+        text = text.removesuffix(".")
+        took = time.monotonic() - started
+        log(f'  dictated ({dictate["language"]}, {took:.1f}s): "{text}"')
+        return {**params, dictate.get("into", "text"): text}
 
     def _set_listening(self, enabled: bool) -> None:
         self.listening = enabled
@@ -151,6 +223,10 @@ def listen_mic(
     settings: Settings, commands: list[Command], dispatch: Dispatcher, backend: str
 ) -> None:
     transcribe = Transcriber(settings, commands)
+    if any("dictate" in cmd for cmd in commands):
+        dispatch.cut_after = transcribe.cut_after
+        dispatch.dictation = Dictation(settings)
+
     utterances, stop, errors = start_capture(settings)
     device = settings["device"] or "default source"
     log(f"Listening on {device} (backend: {backend}). Ctrl+C to quit.")
@@ -160,6 +236,15 @@ def listen_mic(
             audio = utterances.get()
             if audio is None:
                 sys.exit(f"Capture failed: {errors[0]}")
+
+            dictate = dispatch.waiting_dictation()
+            if dictate and dispatch.dictation:
+                started = time.monotonic()
+                text = dispatch.dictation(audio, dictate["language"])
+                took = time.monotonic() - started
+                log(f'dictated ({dictate["language"]}, {took:.1f}s): "{text}"')
+                dispatch.finish_dictation(text)
+                continue
 
             raw, took, length = transcribe(audio)
             timing = (
@@ -171,7 +256,7 @@ def listen_mic(
                 continue
 
             log(f'heard: "{raw}" ({timing})')
-            dispatch(raw)
+            dispatch(raw, audio)
 
     finally:
         stop.set()
@@ -193,7 +278,10 @@ def read_text(dispatch: Dispatcher, backend: str) -> None:
 
         if not interactive:
             log(f'heard: "{raw}"')
-        dispatch(raw)
+        if dispatch.waiting_dictation():
+            dispatch.finish_dictation(raw)
+        else:
+            dispatch(raw)
 
 
 def main() -> None:

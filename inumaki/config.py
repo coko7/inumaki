@@ -22,6 +22,7 @@ class Settings(TypedDict):
     fuzzy_cutoff: float
     screen: list[int]
     launcher: str
+    dictation_model: str
 
 
 DEFAULT_SETTINGS: Settings = {
@@ -41,6 +42,7 @@ DEFAULT_SETTINGS: Settings = {
     "fuzzy_cutoff": 0.8,
     "screen": [1920, 1080],  # used for "50%"-style coordinates
     "launcher": "gtk-launch {id}",  # {id} = desktop file id
+    "dictation_model": "small",  # multilingual, for commands with `dictate`
 }
 
 
@@ -141,10 +143,20 @@ ACTION_TYPES: frozenset[str] = frozenset(
 )
 
 
+class Dictate(TypedDict):
+    """Re-transcribe the speech after `after` with `dictation_model` in
+    `language`, and put the result in the `into` placeholder."""
+
+    language: str
+    after: str
+    into: NotRequired[str]  # default "text"
+
+
 class Command(TypedDict):
     phrases: NotRequired[list[str]]
     pattern: NotRequired[str]
     raw: NotRequired[bool]
+    dictate: NotRequired[Dictate]
     actions: list[Action]
 
 

@@ -126,6 +126,7 @@ To try out your commands without speaking, combine the last two:
 | "open terminal" | Open a terminal |
 | "open Firefox", "launch the file manager" | Launch the closest matching installed app |
 | "type Hello, world" | Type `Hello, world` |
+| "french, bonjour à tous" | Type `bonjour à tous` (dictated in French, see below) |
 | "submit", "press enter" | Press Enter |
 | "space" | Press Space |
 | "new line" | Press Shift+Enter (line break without sending in chat apps) |
@@ -161,6 +162,7 @@ entries. It is git-ignored; `config.example.toml` is the template.
 | `launcher` | `gtk-launch {id}` | Command used by `launch`; `{id}` is the desktop file id |
 | `beam_size` | `1` | Whisper beam size; higher is slower, slightly more accurate |
 | `prompt` | `auto` | Words that bias recognition; `auto` uses your command words |
+| `dictation_model` | `small` | Multilingual model for `dictate` commands; `medium` is more accurate, slower |
 
 ### Commands
 
@@ -190,6 +192,39 @@ actions = [
 - Named groups like `(?P<app>...)` fill `{app}` in the actions.
 - Priority: a phrase equal to the whole sentence, then patterns, then
   phrases contained in the sentence, then fuzzy matches.
+
+### Dictating in another language
+
+English models (`*.en`) can't write French, but they do hear a trigger
+word like "french". A command with `dictate` uses it as a trigger, then
+transcribes the rest of what you said again with `dictation_model`:
+
+```toml
+[[command]]
+pattern = '^\W*(?:(?:type|write)\W+)?(?:in\W+)?french\b\W*(?P<text>.*?)\.?$'
+raw = true
+dictate = { language = "fr", after = "french" }
+actions = [{ type = "type", text = "{text}" }]
+```
+
+Say it in one breath ("french, bonjour à tous"), or say "french",
+pause, then speak: if nothing follows the trigger, your next sentence
+(within 15 seconds) is transcribed in French as a whole. "in french ..."
+and "type french ..." work too; keep this command above the plain "type"
+one so it matches first.
+
+Pick a trigger the English model knows well: a French word like
+"baguette" gets misheard. Trigger words are added to the recognition
+hint automatically.
+
+- `language`: Whisper language code (`fr`, `de`, `es`, ...).
+- `after`: the trigger word(s); only speech after them is re-transcribed.
+- `into`: the placeholder to replace (default `text`).
+
+The second model loads at startup when a `dictate` command exists (about
+500 MB more RAM for `small`), and each dictation takes a second or so
+longer than English typing. In `--text` mode there is no audio, so the
+text is typed as you wrote it.
 
 ### Actions
 
